@@ -1,61 +1,39 @@
-# ⚡ Chief — Digital Chief of Staff
+# ⚡ Chief v3 — Personal Finance OS
 
-No AI subscription needed. Chief tracks everything locally, then generates a ready-made briefing prompt you paste into Claude for free analysis.
+No AI subscription. No accounts. Everything stays on your device.
 
----
+## 🚀 Deploy in 10 minutes
 
-## 🚀 Deploy to Vercel (Free — 10 minutes)
+### 1. Upload to GitHub
+- github.com → New repository → `chief-app` → Private
+- Unzip this file on your computer
+- Go **inside** the folder → Select ALL files → drag to GitHub
+- ⚠️ Upload the FILES, not the folder itself
+- Commit changes
 
-### Step 1 — Upload to GitHub
-1. Go to github.com → **New repository** → name: `chief-app` → Private
-2. Unzip this folder → drag all files into the repo upload screen
-3. Click **Commit changes**
+### 2. Deploy on Vercel
+- vercel.com → Add New Project → Import `chief-app`
+- Framework: Vite (auto-detected)
+- Click Deploy — no env vars needed!
 
-### Step 2 — Deploy on Vercel
-1. Go to vercel.com → **Sign up with GitHub** (free)
-2. Click **Add New Project** → Import `chief-app`
-3. Framework auto-detects as **Vite** ✅
-4. Click **Deploy** — no environment variables needed!
-5. Done in ~60 seconds → you get a URL like `chief-app.vercel.app`
+### 3. Add to iPhone
+- Open your Vercel URL in Safari
+- Tap Share → Add to Home Screen → "Chief"
 
-### Step 3 — Add to iPhone Home Screen
-1. Open your Vercel URL in **Safari**
-2. Tap the **Share button** (box with arrow at bottom)
-3. Tap **"Add to Home Screen"**
-4. Name it **Chief** → tap **Add**
-5. It lives on your home screen like a real app ✅
-
----
-
-## 💻 Run Locally
-
-```bash
+## 💻 Run locally
+```
 npm install
 npm run dev
-# Open http://localhost:5173
 ```
 
----
-
-## ✨ How to Use
-
-1. **Set up your bills** — Bills tab → edit income, add/edit items per cutoff
-2. **Track payments** — Tap ✓ on each bill as you pay it
-3. **Set your loans** — Loans tab → edit or add loans, see freedom dates
-4. **Set savings goals** — Loans tab → scroll down, add goals with targets
-5. **Log notes** — Journal tab → write what's happening in your life
-6. **Get Chief's analysis** — Home tab → tap the blue "Generate Briefing" card → copy → paste into Claude.ai
-
-## ✨ Features
-
-| Tab | What it does |
-|-----|-------------|
-| 🏠 Home | Overview, briefing button, quick journal |
-| ✅ Tasks | Task list with priorities |
-| 📅 Bills | 15th & 30th cutoff checklists, editable |
-| 📊 Loans | Loan tracker with freedom dates + savings goals |
-| 📓 Journal | Personal notes (included in briefing prompt) |
+## ✨ What's New in v3
+- Tasks removed — finance focus only
+- Bills auto-sync to Loans and Savings Goals when paid
+- New Savings tab with bar chart and monthly history
+- New Invest tab with portfolio tracker + PH investment guide
+- Smart Tips engine with 8+ personalized financial insights
+- Net worth tracker on Home
+- Dark luxury theme
 
 ## 🔐 Privacy
-All data is saved to **your browser's localStorage** — it never leaves your device. No accounts, no servers, no subscriptions.
-# personal-tracker
+All data in localStorage — never leaves your device.

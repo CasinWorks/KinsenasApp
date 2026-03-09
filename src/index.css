@@ -1,13 +1,29 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body, #root { height: 100%; font-family: 'DM Sans', -apple-system, sans-serif; background: #F0F4FF; -webkit-font-smoothing: antialiased; }
-::-webkit-scrollbar { display: none; }
-* { -ms-overflow-style: none; scrollbar-width: none; }
-input, button, textarea, select { font-family: inherit; -webkit-tap-highlight-color: transparent; }
-button { cursor: pointer; }
-button:active { opacity: 0.8; transform: scale(0.97); }
-input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
-@keyframes fadeSlide { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-@keyframes slideUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
-@keyframes pulse { 0%,100% { opacity:.4; transform:scale(.85); } 50% { opacity:1; transform:scale(1); } }
-.anim { animation: fadeSlide .28s ease both; }
-.modal-sheet { animation: slideUp .3s cubic-bezier(.32,1.2,.64,1) both; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0F1E;
+  --card:#111827;
+  --card2:#1A2235;
+  --border:#1E2D45;
+  --green:#00F5A0;
+  --green2:#00C47D;
+  --blue:#3B82F6;
+  --purple:#8B5CF6;
+  --red:#F87171;
+  --yellow:#FBBF24;
+  --text:#F0F6FF;
+  --muted:#5A7090;
+  --accent:#00F5A0;
+}
+html,body,#root{height:100%;font-family:'Sora',sans-serif;background:var(--bg);-webkit-font-smoothing:antialiased;color:var(--text)}
+::-webkit-scrollbar{display:none}
+*{-ms-overflow-style:none;scrollbar-width:none}
+input,button,textarea,select{font-family:inherit;-webkit-tap-highlight-color:transparent;color:var(--text)}
+button{cursor:pointer;transition:opacity .15s,transform .1s}
+button:active{opacity:.75;transform:scale(.96)}
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes glow{0%,100%{box-shadow:0 0 20px #00F5A020}50%{box-shadow:0 0 40px #00F5A040}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.anim{animation:fadeUp .3s ease both}
+.modal-enter{animation:slideUp .32s cubic-bezier(.32,1.2,.64,1) both}
