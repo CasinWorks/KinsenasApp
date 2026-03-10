@@ -445,8 +445,12 @@ export default function App() {
   const [investForm,setInvestForm]=useState({});
   const [histModal,setHistModal]=useState(false);
   const [histForm,setHistForm]=useState({month:"",income:"",expenses:"",saved:""});
+  const [monthlyReportOpen,setMonthlyReportOpen]=useState(false);
+  const [monthlyReportCopied,setMonthlyReportCopied]=useState(false);
+  const [importConfirm,setImportConfirm]=useState(null); // { data } when file loaded, confirm before apply
   const [guideItem,setGuideItem]=useState(null);
-  const [updateLoan,setUpdateLoan]=useState(null); // loan to manually add payment
+  const [updateLoan,setUpdateLoan]=useState(null);
+  const importInputRef = useRef(null); // loan to manually add payment
 
   useEffect(()=>save("cutoffs",co),[co]);
   useEffect(()=>save("payments",pay),[pay]);
@@ -552,6 +556,114 @@ export default function App() {
     setSavHist(p=>[...p,{id:uid(),month:histForm.month,income:inc,expenses:exp,saved:sav}].sort((a,b)=>a.month.localeCompare(b.month)));
     setHistModal(false);setHistForm({month:"",income:"",expenses:"",saved:""});
   };
+
+  // ── MONTHLY REPORT (generate after financial responsibilities) ─────────────
+  const buildMonthlyReport = () => {
+    const monthKey = getMonthKey();
+    const s15cur = stats("15th", monthKey), s30cur = stats("30th", monthKey);
+    const income = totalIncome;
+    const expensesPaid = s15cur.paidTot + s30cur.paidTot;
+    const saved = income - expensesPaid;
+    const monthName = new Date().toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+    const billsDone = s15cur.done + s30cur.done;
+    const billsTotal = s15cur.total + s30cur.total;
+    const lines = [
+      `📋 MONTHLY REPORT — ${monthName}`,
+      `Generated ${new Date().toLocaleDateString("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}`,
+      "",
+      "━━ INCOME & SPENDING ━━",
+      `  Income (15th + 30th):     ₱${fmt(income)}`,
+      `  Actually paid (bills):   ₱${fmt(expensesPaid)}`,
+      `  Saved this month:        ₱${fmt(saved)} (${income ? (saved/income*100).toFixed(1) : 0}% of income)`,
+      "",
+      "━━ BILLS STATUS ━━",
+      `  ${billsDone} of ${billsTotal} items marked paid`,
+      billsDone >= billsTotal ? "  ✅ All responsibilities recorded." : "  ⏳ Some items not yet marked paid.",
+      "",
+      "━━ SNAPSHOT ━━",
+      `  Total in savings goals:  ₱${fmt(totalSaved)}`,
+      `  Total invested:           ₱${fmt(totalInvest)}`,
+      `  Debt remaining:           ₱${fmt(totalDebt)}`,
+      `  Net worth:                ₱${fmt(totalSaved + totalInvest - totalDebt)}`,
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ];
+    return {
+      monthName,
+      income,
+      expenses: expensesPaid,
+      saved,
+      reportText: lines.join("\n"),
+      billsDone,
+      billsTotal,
+    };
+  };
+  const addCurrentMonthToHistory = () => {
+    const r = buildMonthlyReport();
+    const existing = savHist.find(h => h.month === r.monthName);
+    if (existing) {
+      setSavHist(prev => prev.map(h => h.month === r.monthName ? { ...h, income: r.income, expenses: r.expenses, saved: r.saved } : h));
+    } else {
+      setSavHist(prev => [...prev, { id: uid(), month: r.monthName, income: r.income, expenses: r.expenses, saved: r.saved }].sort((a, b) => a.month.localeCompare(b.month)));
+    }
+    setMonthlyReportOpen(false);
+  };
+
+  // ── EXPORT / IMPORT (backup & restore across devices) ────────────────────────
+  const EXPORT_VERSION = 1;
+  const exportData = () => {
+    const blob = {
+      version: EXPORT_VERSION,
+      app: "Chief",
+      exportedAt: new Date().toISOString(),
+      cutoffs: co,
+      payments: pay,
+      loans: loans,
+      goals: goals,
+      invest: invest,
+      savhist: savHist,
+    };
+    const str = JSON.stringify(blob, null, 2);
+    const blobObj = new Blob([str], { type: "application/json" });
+    const url = URL.createObjectURL(blobObj);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `chief-backup-${getMonthKey()}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const isValidImport = (d) => d && typeof d === "object" && (d.cutoffs != null || d.payments != null);
+  const handleImportFile = (e) => {
+    const file = e.target?.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!isValidImport(data)) {
+          alert("Invalid backup file. Need at least cutoffs or payments.");
+          return;
+        }
+        setImportConfirm({ data });
+      } catch (err) {
+        alert("Could not read file. Use a Chief backup .json file.");
+      }
+    };
+    reader.readAsText(file);
+  };
+  const applyImport = () => {
+    if (!importConfirm?.data) return;
+    const d = importConfirm.data;
+    if (d.cutoffs != null) setCo(d.cutoffs);
+    if (d.payments != null) setPay(migratePayToMonthKeyed(d.payments) || { [getMonthKey()]: DEF_PAY });
+    if (d.loans != null) setLoans(d.loans);
+    if (d.goals != null) setGoals(d.goals);
+    if (d.invest != null) setInvest(d.invest);
+    if (d.savhist != null) setSavHist(d.savhist);
+    setImportConfirm(null);
+  };
+
   const copyPrompt=()=>{
     navigator.clipboard?.writeText(promptText).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
   };
@@ -691,6 +803,17 @@ export default function App() {
                   <ProgressBar pct={g.current/g.target} color={g.color} h={5}/>
                 </Card>
               ))}
+
+              {/* Backup & restore — export / import for Mac, phone, etc. */}
+              <div style={{marginTop:20,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
+                <div style={{fontSize:13,fontWeight:700,color:C.muted,marginBottom:10,letterSpacing:.5}}>📦 Backup & restore</div>
+                <p style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.4}}>Export or import your data to use Chief on another device (e.g. MacBook ↔ phone).</p>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={exportData} style={{flex:1,padding:12,borderRadius:14,border:`1.5px solid ${C.blue}`,background:C.blueSoft,color:C.blue,fontSize:13,fontWeight:700}}>Export data</button>
+                  <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImportFile} style={{display:"none"}} />
+                  <button onClick={()=>importInputRef.current?.click()} style={{flex:1,padding:12,borderRadius:14,border:`1.5px solid ${C.green}`,background:C.greenSoft,color:C.green,fontSize:13,fontWeight:700}}>Import data</button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -823,6 +946,13 @@ export default function App() {
             <div className="anim" style={{paddingTop:20}}>
               <div style={{fontSize:24,fontWeight:800,color:C.text,marginBottom:4}}>Savings</div>
               <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Track goals and see how your finances grow over time</div>
+
+              {/* Generate monthly report — tap after financial responsibilities */}
+              <button onClick={()=>setMonthlyReportOpen(true)} style={{width:"100%",background:C.blue,border:"none",borderRadius:18,padding:18,marginBottom:16,textAlign:"left",boxShadow:C.shadowMd}}>
+                <div style={{fontSize:12,fontWeight:700,color:"rgba(255,255,255,.9)",letterSpacing:.5,marginBottom:4}}>📋 MONTHLY REPORT</div>
+                <div style={{fontSize:14,color:"rgba(255,255,255,.95)",lineHeight:1.4}}>Generate your monthly summary. Best used after you’ve done all bills and financial responsibilities for the month.</div>
+                <div style={{marginTop:10,fontSize:13,fontWeight:600,color:"rgba(255,255,255,.85)"}}>Generate report →</div>
+              </button>
 
               {/* Savings goals */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
@@ -1194,6 +1324,43 @@ export default function App() {
       )}
 
       {/* ══ MARK PAID ══ */}
+      {/* ── Monthly report modal ── */}
+      {monthlyReportOpen&&((
+        ()=>{
+          const r = buildMonthlyReport();
+          return (
+            <Modal onClose={()=>{setMonthlyReportOpen(false);setMonthlyReportCopied(false)}} title="📋 Monthly Report">
+              <div style={{fontSize:12,color:C.muted,marginBottom:12}}>Copy or add to history. Use after you’ve completed your financial responsibilities for the month.</div>
+              <div style={{background:C.bg,borderRadius:14,padding:14,marginBottom:14,maxHeight:320,overflowY:"auto",border:`1px solid ${C.border}`,whiteSpace:"pre-wrap",fontSize:12,fontFamily:"'DM Sans',sans-serif",lineHeight:1.6}}>{r.reportText}</div>
+              <button onClick={()=>{navigator.clipboard?.writeText(r.reportText);setMonthlyReportCopied(true);setTimeout(()=>setMonthlyReportCopied(false),2000)}}
+                style={{width:"100%",padding:14,borderRadius:14,border:"none",background:monthlyReportCopied?C.green:C.blue,color:"#fff",fontSize:14,fontWeight:700,marginBottom:10}}>
+                {monthlyReportCopied?"✅ Copied!":"📋 Copy report"}
+              </button>
+              <button onClick={addCurrentMonthToHistory}
+                style={{width:"100%",padding:14,borderRadius:14,border:`1.5px solid ${C.green}`,background:C.greenSoft,color:C.green,fontSize:14,fontWeight:700}}>
+                ✅ Add this month to history
+              </button>
+            </Modal>
+          );
+        }
+      )())}
+
+      {/* ── Import confirm (replace data?) ── */}
+      {importConfirm&&(
+        <Modal onClose={()=>setImportConfirm(null)} title="📥 Import backup">
+          <div style={{fontSize:14,color:C.text,marginBottom:16,lineHeight:1.5}}>
+            This will replace all your current data with the imported backup.
+            {importConfirm.data?.exportedAt && (
+              <div style={{marginTop:10,fontSize:12,color:C.muted}}>Backup from: {new Date(importConfirm.data.exportedAt).toLocaleString("en-PH")}</div>
+            )}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={()=>setImportConfirm(null)} style={{flex:1,padding:14,borderRadius:14,border:`1.5px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:14,fontWeight:700}}>Cancel</button>
+            <button onClick={applyImport} style={{flex:1,padding:14,borderRadius:14,border:"none",background:C.green,color:"#fff",fontSize:14,fontWeight:700}}>Import & replace</button>
+          </div>
+        </Modal>
+      )}
+
       {/* ── Done with bills this month? (before next month) ── */}
       {confirmNextMonth&&(
         <Modal onClose={()=>setConfirmNextMonth(null)} title="📅 Move to next month?">
