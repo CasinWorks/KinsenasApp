@@ -1,24 +1,24 @@
-# ⚡ Chief v3 — Personal Finance OS
+# ⚡ KinsenasApp — Personal Finance OS
 
 No AI subscription. No accounts. Everything stays on your device.
 
 ## 🚀 Deploy in 10 minutes
 
 ### 1. Upload to GitHub
-- github.com → New repository → `chief-app` → Private
+- github.com → New repository → `kinsenasapp` → Private
 - Unzip this file on your computer
 - Go **inside** the folder → Select ALL files → drag to GitHub
 - ⚠️ Upload the FILES, not the folder itself
 - Commit changes
 
 ### 2. Deploy on Vercel
-- vercel.com → Add New Project → Import `chief-app`
+- vercel.com → Add New Project → Import `kinsenasapp`
 - Framework: Vite (auto-detected)
 - Click Deploy — no env vars needed!
 
 ### 3. Add to iPhone
 - Open your Vercel URL in Safari
-- Tap Share → Add to Home Screen → "Chief"
+- Tap Share → Add to Home Screen → "KinsenasApp"
 
 ## 💻 Run locally
 ```

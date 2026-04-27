@@ -21,7 +21,8 @@ const C = {
   greenSoft:"#ECFDF5", blueSoft:"#EEF2FF", purpleSoft:"#F5F3FF", yellowSoft:"#FFFBEB", redSoft:"#FEF2F2",
   shadow:"0 2px 12px rgba(26,86,219,.08)", shadowMd:"0 4px 24px rgba(26,86,219,.12)",
 };
-const NS = "chief3_";
+// NOTE: Changing this will start a fresh localStorage namespace.
+const NS = "KinsenasApp_";
 const save = (k,v) => { try{localStorage.setItem(NS+k,JSON.stringify(v))}catch{} };
 const load = (k,d) => { try{const r=localStorage.getItem(NS+k);return r?JSON.parse(r):d}catch{return d} };
 const uid  = () => Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -75,7 +76,7 @@ function LocalAuthScreen({ onUnlocked }) {
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg,padding:18}}>
       <div style={{width:"100%",maxWidth:420,background:C.card,border:`1px solid ${C.border}`,borderRadius:18,boxShadow:C.shadow,padding:18}}>
         <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:8}}>
-          <span style={{filter:"sepia(1) saturate(4) hue-rotate(15deg)"}}>⚡</span> chief
+          <span style={{filter:"sepia(1) saturate(4) hue-rotate(15deg)"}}>⚡</span> KinsenasApp
         </div>
         <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
           {mode === "register" ? (
@@ -708,7 +709,7 @@ export default function App() {
   const exportData = () => {
     const blob = {
       version: EXPORT_VERSION,
-      app: "Chief",
+      app: "KinsenasApp",
       exportedAt: new Date().toISOString(),
       cutoffs: co,
       payments: pay,
@@ -722,7 +723,7 @@ export default function App() {
     const url = URL.createObjectURL(blobObj);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `chief-backup-${getMonthKey()}-${Date.now()}.json`;
+    a.download = `kinsenasapp-backup-${getMonthKey()}-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -741,7 +742,7 @@ export default function App() {
         }
         setImportConfirm({ data });
       } catch (err) {
-        alert("Could not read file. Use a Chief backup .json file.");
+        alert("Could not read file. Use a KinsenasApp backup .json file.");
       }
     };
     reader.readAsText(file);
@@ -809,14 +810,14 @@ export default function App() {
       ...(viewport.isLarge && {boxShadow:"0 0 0 1px rgba(0,0,0,.06), 0 24px 48px rgba(0,0,0,.08)",borderRadius:12}),
     }}>
 
-      {/* Header — time | chief (yellow bolt, black text) | date */}
+      {/* Header — time | KinsenasApp | date */}
       <div style={{background:C.card,padding:"14px 20px 12px",display:"flex",justifyContent:"space-between",
         alignItems:"center",borderBottom:`1px solid ${C.border}`,flexShrink:0,position:"sticky",top:0,zIndex:10,boxShadow:C.shadow}}>
         <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:C.text}}>
           {new Date().toLocaleTimeString("en-PH",{hour:"2-digit",minute:"2-digit"})}
         </div>
         <div style={{fontSize:16,fontWeight:700,color:C.text,letterSpacing:1,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontSize:20,display:"inline-block",filter:"sepia(1) saturate(4) hue-rotate(15deg)"}}>⚡</span> chief
+          <span style={{fontSize:20,display:"inline-block",filter:"sepia(1) saturate(4) hue-rotate(15deg)"}}>⚡</span> KinsenasApp
         </div>
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:C.muted}}>
@@ -1565,7 +1566,7 @@ export default function App() {
       {tutorialOpen && (() => {
         const steps = [
           {
-            title: "Welcome to Chief",
+            title: "Welcome to KinsenasApp",
             icon: "⚡",
             body: (
               <>
