@@ -48,6 +48,11 @@ function LocalAuthScreen({ onUnlocked }) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState(null);
 
+  // Keep mode consistent with whether a password exists
+  useEffect(() => {
+    setMode(hasAccount ? "login" : "register");
+  }, [hasAccount]);
+
   const submit = async () => {
     setMsg(null);
     setLoading(true);
@@ -91,18 +96,7 @@ function LocalAuthScreen({ onUnlocked }) {
           )}
         </div>
 
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <button onClick={()=>{setMode("login");setMsg(null)}} style={{
-            flex:1,border:"none",borderRadius:999,padding:"8px 12px",fontSize:12,fontWeight:700,
-            background:mode==="login"?C.blue:C.card2,color:mode==="login"?"#fff":C.muted
-          }}>Unlock</button>
-          {!hasAccount && (
-            <button onClick={()=>{setMode("register");setMsg(null)}} style={{
-              flex:1,border:"none",borderRadius:999,padding:"8px 12px",fontSize:12,fontWeight:700,
-              background:mode==="register"?C.blue:C.card2,color:mode==="register"?"#fff":C.muted
-            }}>Set password</button>
-          )}
-        </div>
+        {/* Remove top mode switcher: keep one clear primary action */}
 
         {msg && (
           <div style={{background:C.redSoft,border:`1px solid ${C.red}22`,borderRadius:12,padding:"10px 12px",marginBottom:12,color:C.text,fontSize:12,lineHeight:1.4}}>
