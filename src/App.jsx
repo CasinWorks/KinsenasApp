@@ -29,6 +29,112 @@ const fmt  = n => Number(n||0).toLocaleString("en-PH",{minimumFractionDigits:0,m
 const fmtK = n => n>=1000?`₱${(n/1000).toFixed(1)}K`:`₱${fmt(n)}`;
 const catIco = c => ({loan:"🏦",bill:"📄",expense:"💳",savings:"💚",investment:"📈"}[c]||"📋");
 
+// ── LOCAL AUTH (offline app lock) ────────────────────────────────────────────
+const AUTH_HASH_KEY = `${NS}auth_hash_v1`;
+const ONBOARD_KEY = `${NS}onboarded_v1`;
+
+async function sha256Hex(input) {
+  const enc = new TextEncoder().encode(input);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+function LocalAuthScreen({ onUnlocked }) {
+  const hasAccount = !!localStorage.getItem(AUTH_HASH_KEY);
+  const [mode, setMode] = useState(() => (hasAccount ? "login" : "register")); // login | register
+  const [pass, setPass] = useState("");
+  const [pass2, setPass2] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const submit = async () => {
+    setMsg(null);
+    setLoading(true);
+    try {
+      if (mode === "register") {
+        if (pass.length < 6) throw new Error("Use at least 6 characters.");
+        if (pass !== pass2) throw new Error("Passwords do not match.");
+        const h = await sha256Hex(pass);
+        localStorage.setItem(AUTH_HASH_KEY, h);
+        onUnlocked?.();
+      } else {
+        const existing = localStorage.getItem(AUTH_HASH_KEY);
+        if (!existing) { setMode("register"); setMsg("No password set yet. Set a password first."); return; }
+        const h = await sha256Hex(pass);
+        if (h !== existing) throw new Error("Incorrect password.");
+        onUnlocked?.();
+      }
+    } catch (e) {
+      setMsg(e?.message || "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg,padding:18}}>
+      <div style={{width:"100%",maxWidth:420,background:C.card,border:`1px solid ${C.border}`,borderRadius:18,boxShadow:C.shadow,padding:18}}>
+        <div style={{fontSize:18,fontWeight:800,color:C.text,marginBottom:8}}>
+          <span style={{filter:"sepia(1) saturate(4) hue-rotate(15deg)"}}>⚡</span> chief
+        </div>
+        <div style={{fontSize:12,color:C.muted,marginBottom:14,lineHeight:1.6}}>
+          {mode === "register" ? (
+            <>
+              Set a password for this device. <strong style={{color:C.text}}>No email / username</strong> is needed because this app stores
+              everything locally (offline). This password is just to lock your data on this device.
+            </>
+          ) : (
+            <>
+              Unlock this app on this device. (Local-only — nothing is sent to a server.)
+            </>
+          )}
+        </div>
+
+        <div style={{display:"flex",gap:8,marginBottom:12}}>
+          <button onClick={()=>{setMode("login");setMsg(null)}} style={{
+            flex:1,border:"none",borderRadius:999,padding:"8px 12px",fontSize:12,fontWeight:700,
+            background:mode==="login"?C.blue:C.card2,color:mode==="login"?"#fff":C.muted
+          }}>Unlock</button>
+          <button onClick={()=>{setMode("register");setMsg(null)}} style={{
+            flex:1,border:"none",borderRadius:999,padding:"8px 12px",fontSize:12,fontWeight:700,
+            background:mode==="register"?C.blue:C.card2,color:mode==="register"?"#fff":C.muted
+          }}>Set password</button>
+        </div>
+
+        {msg && (
+          <div style={{background:C.redSoft,border:`1px solid ${C.red}22`,borderRadius:12,padding:"10px 12px",marginBottom:12,color:C.text,fontSize:12,lineHeight:1.4}}>
+            {msg}
+          </div>
+        )}
+
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6}}>Password</div>
+          <input value={pass} onChange={e=>setPass(e.target.value)} type="password" placeholder="••••••••"
+            style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 14px",fontSize:14,outline:"none"}} />
+        </div>
+        {mode === "register" && (
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:C.muted,fontWeight:700,marginBottom:6}}>Confirm password</div>
+            <input value={pass2} onChange={e=>setPass2(e.target.value)} type="password" placeholder="••••••••"
+              style={{width:"100%",background:C.bg,border:`1.5px solid ${C.border}`,borderRadius:12,padding:"12px 14px",fontSize:14,outline:"none"}} />
+          </div>
+        )}
+
+        <button disabled={loading || !pass || (mode==="register" && !pass2)} onClick={submit} style={{
+          width:"100%",border:"none",borderRadius:14,padding:14,fontSize:14,fontWeight:800,
+          background:loading?C.card2:C.blue,color:loading?C.muted:"#fff",opacity:(!pass||(mode==="register"&&!pass2))?0.6:1
+        }}>
+          {loading ? "Please wait..." : (mode==="register" ? "Save password" : "Unlock")}
+        </button>
+
+        <div style={{marginTop:12,fontSize:11,color:C.muted,lineHeight:1.5}}>
+          Everything is local. Your login is stored only on this device. If you forget your password, you’ll need to clear the site’s data to reset it.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── FINANCIAL TIPS ENGINE ─────────────────────────────────────────────────────
 function generateTips(co, pay, loans, goals, invest, savHist) {
   const totalIncome   = Object.values(co).reduce((s,c)=>s+c.income,0);
@@ -161,23 +267,10 @@ const INVEST_GUIDE = [
 ];
 
 // ── DEFAULTS ──────────────────────────────────────────────────────────────────
+// Defaults start at 0 / blank
 const DEF_CUTOFFS = {
-  "15th":{ label:"15th Cutoff", income:25778.06, items:[
-    {id:"a1",name:"Food",budget:5000,cat:"expense"},
-    {id:"a2",name:"Commute",budget:2000,cat:"expense"},
-    {id:"a3",name:"Date / Personal",budget:10000,cat:"expense"},
-    {id:"a4",name:"Internet",budget:1600,cat:"bill"},
-    {id:"a5",name:"Electricity",budget:3200,cat:"bill"},
-    {id:"a6",name:"Gas",budget:1000,cat:"bill"},
-    {id:"a7",name:"Subscription",budget:179,cat:"bill"},
-  ]},
-  "30th":{ label:"30th Cutoff", income:28838, items:[
-    {id:"b1",name:"Car Loan — Geely",budget:15600,cat:"loan",loanLink:"l1"},
-    {id:"b2",name:"BPI Loan",budget:1965.33,cat:"loan",loanLink:"l2"},
-    {id:"b3",name:"Netflix",budget:620,cat:"bill"},
-    {id:"b4",name:"Credit Card BPI",budget:5000,cat:"bill"},
-    {id:"b5",name:"Savings",budget:5000,cat:"savings",goalLink:"g1"},
-  ]},
+  "15th":{ label:"15th Cutoff", income:0, items:[] },
+  "30th":{ label:"30th Cutoff", income:0, items:[] },
 };
 const DEF_PAY = {"15th":{},"30th":{}};
 
@@ -213,27 +306,11 @@ function migratePayToMonthKeyed(loaded) {
   return loaded;
 }
 
-const DEF_LOANS = [
-  {id:"l1",name:"Car Loan — Geely",total:936000,monthly:15600,paid:468000,color:C.blue,notes:"Geely Azkarra"},
-  {id:"l2",name:"BPI Personal Loan",total:70752,monthly:1965.33,paid:21618.63,color:C.purple,notes:""},
-];
-const DEF_GOALS = [
-  {id:"g1",name:"Emergency Fund",target:100000,current:18000,color:C.green,icon:"🛡️"},
-  {id:"g2",name:"Vacation — Japan",target:80000,current:12000,color:C.blue,icon:"✈️"},
-  {id:"g3",name:"New Laptop",target:60000,current:5000,color:C.purple,icon:"💻"},
-];
-const DEF_INVEST = [
-  {id:"i1",name:"Pag-IBIG MP2",type:"mp2",invested:10000,currentValue:10700,notes:"Started Jan 2025"},
-];
+const DEF_LOANS = [];
+const DEF_GOALS = [];
+const DEF_INVEST = [];
 // savings history: [{month:"Mar 2025", income, expenses, saved}]
-const DEF_SAV_HIST = [
-  {id:"h1",month:"Oct 2025",income:54616,expenses:47164,saved:7452},
-  {id:"h2",month:"Nov 2025",income:54616,expenses:48000,saved:6616},
-  {id:"h3",month:"Dec 2025",income:54616,expenses:50000,saved:4616},
-  {id:"h4",month:"Jan 2026",income:54616,expenses:46500,saved:8116},
-  {id:"h5",month:"Feb 2026",income:54616,expenses:47164,saved:7452},
-  {id:"h6",month:"Mar 2026",income:54616,expenses:47164,saved:7452},
-];
+const DEF_SAV_HIST = [];
 
 // ── UI PRIMITIVES ─────────────────────────────────────────────────────────────
 const Card = ({children,style={}}) => (
@@ -414,6 +491,8 @@ function buildPrompt(co,pay,loans,goals,invest,savHist) {
 // ── APP ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const viewport = useViewport();
+  const [unlocked, setUnlocked] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   const [tab,setTab]     = useState("home");
   const [co,setCo]       = useState(()=>load("cutoffs",DEF_CUTOFFS));
   const [pay,setPay]     = useState(()=>migratePayToMonthKeyed(load("payments",null))||{[getMonthKey()]:DEF_PAY});
@@ -448,9 +527,24 @@ export default function App() {
   const [monthlyReportOpen,setMonthlyReportOpen]=useState(false);
   const [monthlyReportCopied,setMonthlyReportCopied]=useState(false);
   const [importConfirm,setImportConfirm]=useState(null); // { data } when file loaded, confirm before apply
+  const [tutorialOpen,setTutorialOpen]=useState(false);
+  const [tutorialStep,setTutorialStep]=useState(0);
   const [guideItem,setGuideItem]=useState(null);
   const [updateLoan,setUpdateLoan]=useState(null);
-  const importInputRef = useRef(null); // loan to manually add payment
+  const importInputRef = useRef(null);
+
+  // Local auth readiness (no network)
+  useEffect(() => {
+    setAuthReady(true);
+  }, []);
+
+  // First-time tutorial (local)
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem(ONBOARD_KEY) === "1";
+      if (!seen) setTutorialOpen(true);
+    } catch {}
+  }, []);
 
   useEffect(()=>save("cutoffs",co),[co]);
   useEffect(()=>save("payments",pay),[pay]);
@@ -664,6 +758,28 @@ export default function App() {
     setImportConfirm(null);
   };
 
+  const resetToDefaults = () => {
+    // Clear finance-related local storage + reset state
+    try {
+      localStorage.removeItem(NS+"cutoffs");
+      localStorage.removeItem(NS+"payments");
+      localStorage.removeItem(NS+"loans");
+      localStorage.removeItem(NS+"goals");
+      localStorage.removeItem(NS+"invest");
+      localStorage.removeItem(NS+"savhist");
+    } catch {}
+
+    setCo(DEF_CUTOFFS);
+    setPay({ [getMonthKey()]: DEF_PAY });
+    setLoans(DEF_LOANS);
+    setGoals(DEF_GOALS);
+    setInvest(DEF_INVEST);
+    setSavHist(DEF_SAV_HIST);
+    setBillMonth(getMonthKey());
+    setCoTab("15th");
+    setTab("home");
+  };
+
   const copyPrompt=()=>{
     navigator.clipboard?.writeText(promptText).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500)});
   };
@@ -674,6 +790,18 @@ export default function App() {
 
   // ── RENDER (responsive: mobile full width; iPad/desktop same centered card) ──
   const appMaxWidth = viewport.isMobile ? "100%" : 460;
+
+  if (!authReady) {
+    return (
+      <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:C.bg,color:C.muted,fontFamily:"'DM Sans',sans-serif"}}>
+        Loading…
+      </div>
+    );
+  }
+  if (!unlocked) {
+    return <LocalAuthScreen onUnlocked={()=>setUnlocked(true)} />;
+  }
+
   return (
     <div className="app-root" style={{
       width:"100%",maxWidth:appMaxWidth,margin:"0 auto",minHeight:"100vh",height:"100vh",display:"flex",flexDirection:"column",
@@ -694,6 +822,13 @@ export default function App() {
           <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:C.muted}}>
             {new Date().toLocaleDateString("en-PH",{month:"short",day:"numeric"})}
           </div>
+          {!!localStorage.getItem(AUTH_HASH_KEY) && (
+            <button onClick={()=>setUnlocked(false)} style={{background:C.card2,border:`1.5px solid ${C.border}`,
+              borderRadius:20,padding:"6px 10px",display:"flex",alignItems:"center",gap:6}}>
+              <span style={{fontSize:12}}>🔒</span>
+              <span style={{fontSize:11,fontWeight:700,color:C.muted}}>Lock</span>
+            </button>
+          )}
           <button onClick={()=>setTipsOpen(true)} style={{background:criticalTips>0?C.redSoft:C.bg,border:`1.5px solid ${criticalTips>0?C.red:C.border}`,
             borderRadius:20,padding:"6px 12px",display:"flex",alignItems:"center",gap:6}}>
             <span style={{fontSize:12}}>💡</span>
@@ -1251,6 +1386,70 @@ export default function App() {
             </div>
           )}
 
+          {/* ═══════ SETTINGS ═══════ */}
+          {tab==="settings"&&(
+            <div className="anim" style={{paddingTop:20}}>
+              <div style={{fontSize:24,fontWeight:800,color:C.text,marginBottom:4}}>Settings</div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:16}}>Privacy, tutorial, and app controls</div>
+
+              <Card style={{marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>🔒 100% Local</div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>
+                  All data (including your login/app lock) stays on <strong style={{color:C.text}}>this device only</strong>.
+                  There is <strong style={{color:C.text}}>no database</strong> and no server storing your records.
+                </div>
+              </Card>
+
+              <Card style={{marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:10}}>🎓 Tutorial</div>
+                <button onClick={()=>{setTutorialStep(0);setTutorialOpen(true)}} style={{width:"100%",padding:12,borderRadius:14,border:"none",background:C.blue,color:"#fff",fontSize:13,fontWeight:800}}>
+                  View tutorial again
+                </button>
+                <button onClick={()=>{try{localStorage.removeItem(ONBOARD_KEY)}catch{};}} style={{width:"100%",marginTop:10,padding:12,borderRadius:14,border:`1.5px solid ${C.border}`,background:"transparent",color:C.muted,fontSize:13,fontWeight:700}}>
+                  Show tutorial on next launch
+                </button>
+              </Card>
+
+              <Card style={{marginBottom:12,border:`1px solid ${C.red}22`}}>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>🧹 Reset data</div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.6,marginBottom:12}}>
+                  Reset all finance data back to <strong style={{color:C.text}}>0 / blank defaults</strong> on this device.
+                  (This does not remove your app lock password.)
+                </div>
+                <button
+                  onClick={()=>{
+                    const ok = confirm("Reset all finance data to 0/blank defaults? This cannot be undone.");
+                    if(ok) resetToDefaults();
+                  }}
+                  style={{width:"100%",padding:12,borderRadius:14,border:"none",background:C.red,color:"#fff",fontSize:13,fontWeight:800}}
+                >
+                  Reset finance data to default
+                </button>
+              </Card>
+
+              <Card style={{marginBottom:12}}>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>📩 Contact / Demo</div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.6}}>
+                  This product is for <strong style={{color:C.text}}>demo</strong>. You can use it personally as you please.
+                  For investment opportunities (or donations), contact{" "}
+                  <a href="mailto:christianjoshuacasin@gmail.com" style={{color:C.blue,fontWeight:800,textDecoration:"none"}}>christianjoshuacasin@gmail.com</a>.
+                </div>
+              </Card>
+
+              <Card>
+                <div style={{fontSize:13,fontWeight:800,color:C.text,marginBottom:6}}>📦 Backup & restore</div>
+                <div style={{fontSize:12,color:C.muted,marginBottom:12,lineHeight:1.4}}>
+                  Move your data between devices using Export/Import (offline file).
+                </div>
+                <div style={{display:"flex",gap:10}}>
+                  <button onClick={exportData} style={{flex:1,padding:12,borderRadius:14,border:`1.5px solid ${C.blue}`,background:C.blueSoft,color:C.blue,fontSize:13,fontWeight:800}}>Export</button>
+                  <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImportFile} style={{display:"none"}} />
+                  <button onClick={()=>importInputRef.current?.click()} style={{flex:1,padding:12,borderRadius:14,border:`1.5px solid ${C.green}`,background:C.greenSoft,color:C.green,fontSize:13,fontWeight:800}}>Import</button>
+                </div>
+              </Card>
+            </div>
+          )}
+
         </div>
       </div>
 
@@ -1263,6 +1462,7 @@ export default function App() {
           {id:"savings",emoji:"💚",label:"Savings"},
           {id:"loans",  emoji:"📊",label:"Loans"},
           {id:"invest", emoji:"📈",label:"Invest"},
+          {id:"settings", emoji:"⚙️",label:"Settings"},
         ].map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,background:"none",border:"none",
             display:"flex",flexDirection:"column",alignItems:"center",gap:4,padding:"6px 0",position:"relative"}}>
@@ -1360,6 +1560,153 @@ export default function App() {
           </div>
         </Modal>
       )}
+
+      {/* ── Tutorial (first timer) ─────────────────────────────────────────── */}
+      {tutorialOpen && (() => {
+        const steps = [
+          {
+            title: "Welcome to Chief",
+            icon: "⚡",
+            body: (
+              <>
+                <div style={{fontSize:14,color:C.text,fontWeight:800,marginBottom:8}}>Everything is local.</div>
+                <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                  All data — including your login/app lock — is kept only on <strong style={{color:C.text}}>your device</strong>.
+                  There is <strong style={{color:C.text}}>NO database</strong> and no server storing your records.
+                </div>
+                <div style={{marginTop:12,fontSize:12,color:C.muted,lineHeight:1.7}}>
+                  This product is for <strong style={{color:C.text}}>demo</strong>. You can use it personally as you please.
+                  For investment opportunities (or donations), contact{" "}
+                  <a href="mailto:christianjoshuacasin@gmail.com" style={{color:C.blue,fontWeight:800,textDecoration:"none"}}>christianjoshuacasin@gmail.com</a>.
+                </div>
+              </>
+            )
+          },
+          {
+            title: "Navigation",
+            icon: "🧭",
+            body: (
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                Use the bottom tabs to move between features:
+                <div style={{marginTop:10,display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[
+                    ["🏠 Home","Overview + backup"],
+                    ["📅 Bills","Cutoffs + paid tracking"],
+                    ["💚 Savings","Goals + history + report"],
+                    ["📊 Loans","Debt tracking"],
+                    ["📈 Invest","Portfolio + guide"],
+                    ["⚙️ Settings","Tutorial + privacy"],
+                  ].map(([a,b])=>(
+                    <div key={a} style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:12,padding:"10px 12px"}}>
+                      <div style={{fontSize:12,fontWeight:800,color:C.text}}>{a}</div>
+                      <div style={{fontSize:11,color:C.muted,marginTop:2}}>{b}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          },
+          {
+            title: "Bills & Payments",
+            icon: "📅",
+            body: (
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                - Track your 15th & 30th cutoff items.<br/>
+                - Tap ✓ to mark paid (with amount + date).<br/>
+                - Loan or Savings items can auto-sync to Loans/Goals.<br/>
+                - When moving to next month, you’ll be asked if you’re done.
+              </div>
+            )
+          },
+          {
+            title: "Savings",
+            icon: "💚",
+            body: (
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                - Create Savings Goals (e.g. Emergency Fund).<br/>
+                - Add monthly history (Income / Expenses / Saved).<br/>
+                - Use “Monthly Report” after you’ve finished your responsibilities to generate a summary and add it to history.
+              </div>
+            )
+          },
+          {
+            title: "Loans, Invest, Tips",
+            icon: "📊",
+            body: (
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                - Loans: track paid %, months left, and freedom date.<br/>
+                - Invest: track holdings + learn options in the guide.<br/>
+                - Tips: rule-based advice using your numbers (savings rate, emergency fund months, debt ratio, etc.).
+              </div>
+            )
+          },
+          {
+            title: "Backup & restore",
+            icon: "📦",
+            body: (
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                Want the same data on another device? Use Export/Import to move a backup file (offline).
+                <div style={{marginTop:10,background:C.blueSoft,border:`1px solid ${C.blue}22`,borderRadius:12,padding:"10px 12px",color:C.text}}>
+                  Tip: Export on your Mac → AirDrop to iPhone → Import on iPhone.
+                </div>
+              </div>
+            )
+          },
+          {
+            title: "Mobile-first + responsive",
+            icon: "📱",
+            body: (
+              <div style={{fontSize:12,color:C.muted,lineHeight:1.7}}>
+                This app is designed primarily for <strong style={{color:C.text}}>mobile</strong>, but it automatically adapts
+                for iPad and desktop with a responsive layout.
+                <div style={{marginTop:10}}>
+                  You can revisit this tutorial anytime in <strong style={{color:C.text}}>Settings</strong>.
+                </div>
+              </div>
+            )
+          },
+        ];
+
+        const s = steps[Math.min(tutorialStep, steps.length - 1)];
+        const last = tutorialStep >= steps.length - 1;
+
+        return (
+          <Modal onClose={() => { setTutorialOpen(false); try { localStorage.setItem(ONBOARD_KEY, "1"); } catch {} }} title={`${s.icon} ${s.title}`}>
+            <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+              {steps.map((_,i)=>(
+                <div key={i} style={{height:6,width: i===tutorialStep ? 34 : 18, borderRadius:99, background:i<=tutorialStep?C.blue:C.border, transition:"width .2s"}}/>
+              ))}
+            </div>
+
+            <div>{s.body}</div>
+
+            <div style={{position:"sticky",bottom:0,marginTop:18,paddingTop:12,background:C.card}}>
+              <div style={{display:"flex",gap:10}}>
+                <button
+                  onClick={()=>setTutorialStep(p=>Math.max(0,p-1))}
+                  disabled={tutorialStep===0}
+                  style={{flex:1,padding:14,borderRadius:14,border:`1.5px solid ${C.border}`,background:"transparent",color:tutorialStep===0?C.border:C.muted,fontSize:14,fontWeight:800}}
+                >
+                  ← Previous
+                </button>
+                <button
+                  onClick={()=>{
+                    if(last){
+                      setTutorialOpen(false);
+                      try{localStorage.setItem(ONBOARD_KEY,"1")}catch{}
+                    } else {
+                      setTutorialStep(p=>p+1);
+                    }
+                  }}
+                  style={{flex:1,padding:14,borderRadius:14,border:"none",background:C.blue,color:"#fff",fontSize:14,fontWeight:800}}
+                >
+                  {last ? "Finish" : "Next →"}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* ── Done with bills this month? (before next month) ── */}
       {confirmNextMonth&&(
